@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق جرد المناديب</title>
+    
+    <!-- وسم PWA للتعريف بالـ Manifest المدمج -->
+    <link rel="manifest" href="data:application/manifest+json;utf8,{%22name%22:%22%D8%AC%D8%B1%D8%AF%20%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%B1%D8%A9%20%D8%A7%D9%84%D9%8A%D9%88%D9%85%D9%8A%22,%22short_name%22:%22%D8%AC%D8%B1%D8%AF%20%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%B1%D8%A9%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%23f3f4f6%22,%22theme_color%22:%22%232563eb%22,%22orientation%22:%22portrait%22,%22icons%22:[{%22src%22:%22data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20512%20512%27%20fill%3D%27%232563eb%27%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27100%27/%3E%3Cpath%20d%3D%27M120%20140h272v232H120z%27%20fill%3D%27%23fff%27/%3E%3Ccircle%20cx%3D%27256%27%20cy%3D%27256%27%20r%3D%2760%27%20fill%3D%27%232563eb%27/%3E%3C/svg%3E%22,%22sizes%22:%22512x512%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%20maskable%22}]}">
+    
+    <!-- وسوم دعم هواتف آيفون (iOS) لتظهر كـ PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="جرد السيارة">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f3f4f6;
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">جرد السيارة اليومي</h1>
+            <span id="currentDateDisplay" class="text-sm font-semibold opacity-90"></span>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 max-w-5xl pb-24">
+        
+        <!-- إشعار إمكانية تثبيت التطبيق على الشاشة الرئيسية -->
+        <div id="pwaInstallBanner" class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm hidden flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-100 p-2 rounded-lg text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h4 class="font-bold text-gray-800">ثبت التطبيق على هاتفك</h4>
+                    <p class="text-xs text-gray-600">تصفح وجرد بوضع أوفلاين كامل وبسرعة أكبر من شاشتك الرئيسية!</p>
+                </div>
+            </div>
+            <div class="flex gap-2 w-full md:w-auto">
+                <button id="pwaInstallBtn" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-lg shadow-sm transition-colors flex-1 md:flex-initial">تثبيت الآن</button>
+                <button id="pwaDismissBtn" class="text-gray-500 hover:text-gray-700 text-xs px-3 py-2">لاحقاً</button>
+            </div>
+        </div>
+        
+        <section class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="mb-6 border-b pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex flex-col md:flex-row gap-4 items-start md:items-end w-full md:w-auto">
+                    <div>
+                        <label for="recordDate" class="block text-sm font-semibold text-gray-700 mb-2">تاريخ الجرد</label>
+                        <input type="date" id="recordDate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow">
+                    </div>
+                    <button id="manageCategoriesBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        إدارة الأصناف والمجموعات
+                    </button>
+                </div>
+                <div class="bg-blue-50 text-blue-800 text-xs rounded-lg p-3 border border-blue-100 max-w-md w-full md:w-auto">
+                    <span class="font-bold">المعادلة المعتمدة للسيارة:</span><br>
+                    الرصيد الحالي = الرصيد السابق + الوارد + مرتجع العميل - المبيعات - ارتجاع للمخزن
+                </div>
+            </div>
+
+            <!-- حاوية الأصناف الديناميكية -->
+            <div id="dynamicCategoriesContainer" class="space-y-6">
+                <!-- سيتم إنشاء حقول الأصناف ديناميكياً بواسطة الجافاسكريبت هنا -->
+            </div>
+
+            <!-- رسالة في حال عدم وجود أصناف -->
+            <div id="noCategoriesAlert" class="hidden text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                <p class="text-gray-500 mb-4">لا توجد أي أصناف مضافة حالياً في النظام.</p>
+                <button id="addFirstCategoryBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">إضافة أول صنف الآن</button>
+            </div>
+
+            <!-- إجماليات اليوم -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">إجماليات اليوم</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gray-800 text-white p-4 rounded-xl shadow text-center">
+                        <span class="block text-sm opacity-80 mb-1">إجمالي الكراتين المباعة</span>
+                        <span id="totalItemsOut" class="text-3xl font-extrabold">0</span>
+                    </div>
+                    <div class="bg-green-600 text-white p-4 rounded-xl shadow text-center">
+                        <span class="block text-sm opacity-80 mb-1">إجمالي قيمة المبيعات</span>
+                        <div class="flex justify-center items-baseline gap-1">
+                            <span id="totalSalesValue" class="text-3xl font-extrabold">0</span>
+                            <span class="text-sm">ج.م</span>
+                        </div>
+                    </div>
+                    <div class="bg-blue-600 text-white p-4 rounded-xl shadow text-center">
+                        <span class="block text-sm opacity-80 mb-1">إجمالي رصيد السيارة (متبقي)</span>
+                        <div class="flex justify-center items-baseline gap-1">
+                            <span id="totalCurrentBalance" class="text-3xl font-extrabold">0</span>
+                            <span class="text-sm">كرتونة</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex justify-end">
+                <button id="saveBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-colors flex items-center gap-2 w-full md:w-auto justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    حفظ جرد اليوم
+                </button>
+            </div>
+        </section>
+
+        <!-- سجل الجرد السابق -->
+        <section class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">سجل الجرد السابق</h2>
+                <button id="clearHistoryBtn" class="text-sm text-red-600 hover:text-red-800 border border-red-200 px-3 py-1 rounded hover:bg-red-50 transition">مسح السجل</button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right font-medium text-gray-500 uppercase tracking-wider">التاريخ</th>
+                            <th scope="col" class="px-6 py-3 text-right font-medium text-gray-500 uppercase tracking-wider">إجمالي المنصرف</th>
+                            <th scope="col" class="px-6 py-3 text-right font-medium text-gray-500 uppercase tracking-wider">قيمة المبيعات</th>
+                            <th scope="col" class="px-6 py-3 text-right font-medium text-gray-500 uppercase tracking-wider">التفاصيل الكاملة للأصناف</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- صفوف السجل تولد برمجياً هنا -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="noHistoryMsg" class="text-center py-8 text-gray-500 hidden">
+                لا توجد سجلات جرد سابقة.
+            </div>
+        </section>
+    </main>
+
+    <!-- مودال إدارة المجموعات والأصناف -->
+    <div id="manageCategoriesModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-40 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 shadow-2xl transform scale-95 transition-transform duration-300 flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-lg font-bold text-gray-900">إدارة مجموعات وأصناف الكراتين</h3>
+                <button id="closeManageModalBtn" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- نموذج إضافة صنف جديد -->
+            <form id="addCategoryForm" class="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6 flex flex-col md:flex-row gap-3 items-end">
+                <div class="flex-1 w-full">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">اسم المجموعة الجديد (مثال: كراتين الـ 150 جنيه (الفيت))</label>
+                    <input type="text" id="newCatName" placeholder="اكتب اسم الصنف هنا..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" required>
+                </div>
+                <div class="w-full md:w-32">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">سعر الكرتونة</label>
+                    <input type="number" id="newCatPrice" placeholder="السعر" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" required>
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors text-sm w-full md:w-auto">
+                    إضافة صنف
+                </button>
+            </form>
+
+            <!-- قائمة الأصناف الحالية قابلة للتعديل والحذف -->
+            <div class="flex-1 overflow-y-auto space-y-3 pr-1" id="categoriesListContainer">
+                <!-- قائمة الأصناف تولد هنا برمجياً -->
+            </div>
+
+            <div class="border-t pt-4 mt-4 flex justify-end">
+                <button id="saveCategoriesOrderBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                    حفظ التعديلات وإغلاق
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- المودال المخصص للتنبيهات والإشعارات بدلاً من alert -->
+    <div id="notificationModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl transform scale-95 transition-transform duration-300" id="notificationContent">
+            <div class="text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                    <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modalTitle">تم الحفظ بنجاح</h3>
+                <div class="mt-2">
+                    <p class="text-sm text-gray-500" id="modalMessage">تم حفظ جرد اليوم في السجل.</p>
+                </div>
+                <div class="mt-4">
+                    <button type="button" id="closeModalBtn" class="inline-flex justify-center w-full rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm">
+                        حسناً
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // PWA - تسجيل عامل الخدمة (Service Worker) لتأكيد العمل أوفلاين 100%
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `
+                    const CACHE_NAME = 'inventory-pwa-v3';
+                    const ASSETS = [
+                        '/',
+                        window.location.pathname,
+                        'https://cdn.tailwindcss.com',
+                        'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap'
+                    ];
+
+                    self.addEventListener('install', (e) => {
+                        e.waitUntil(
+                            caches.open(CACHE_NAME).then((cache) => {
+                                return cache.addAll(ASSETS).catch(() => {});
+                            })
+                        );
+                    });
+
+                    self.addEventListener('activate', (e) => {
+                        e.waitUntil(
+                            caches.keys().then((keys) => {
+                                return Promise.all(
+                                    keys.map((key) => {
+                                        if (key !== CACHE_NAME) {
+                                            return caches.delete(key);
+                                        }
+                                    })
+                                );
+                            })
+                        );
+                    });
+
+                    self.addEventListener('fetch', (e) => {
+                        e.respondWith(
+                            caches.match(e.request).then((cachedResponse) => {
+                                if (cachedResponse) return cachedResponse;
+                                return fetch(e.request).then((response) => {
+                                    if (e.request.method === 'GET' && e.request.url.startsWith('http')) {
+                                        const responseClone = response.clone();
+                                        caches.open(CACHE_NAME).then((cache) => {
+                                            cache.put(e.request, responseClone);
+                                        });
+                                    }
+                                    return response;
+                                }).catch(() => {
+                                    if (e.request.mode === 'navigate') {
+                                        return caches.match('/');
+                                    }
+                                });
+                            })
+                        );
+                    });
+                `;
+
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                navigator.serviceWorker.register(swUrl)
+                    .then(reg => console.log('PWA Service Worker registered successfully!'))
+                    .catch(err => console.log('Service Worker registration failed: ', err));
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Elements
+            const dateInput = document.getElementById('recordDate');
+            const currentDateDisplay = document.getElementById('currentDateDisplay');
+            const saveBtn = document.getElementById('saveBtn');
+            const historyTableBody = document.getElementById('historyTableBody');
+            const noHistoryMsg = document.getElementById('noHistoryMsg');
+            const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+            const dynamicCategoriesContainer = document.getElementById('dynamicCategoriesContainer');
+            const noCategoriesAlert = document.getElementById('noCategoriesAlert');
+            const addFirstCategoryBtn = document.getElementById('addFirstCategoryBtn');
+            
+            // Manage Modal Elements
+            const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+            const manageCategoriesModal = document.getElementById('manageCategoriesModal');
+            const closeManageModalBtn = document.getElementById('closeManageModalBtn');
+            const addCategoryForm = document.getElementById('addCategoryForm');
+            const newCatName = document.getElementById('newCatName');
+            const newCatPrice = document.getElementById('newCatPrice');
+            const categoriesListContainer = document.getElementById('categoriesListContainer');
+            const saveCategoriesOrderBtn = document.getElementById('saveCategoriesOrderBtn');
+
+            // Modal Elements
+            const modal = document.getElementById('notificationModal');
+            const modalContent = document.getElementById('notificationContent');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+
+            // PWA Installation Banner
+            const pwaInstallBanner = document.getElementById('pwaInstallBanner');
+            const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+            const pwaDismissBtn = document.getElementById('pwaDismissBtn');
+            let deferredPrompt;
+
+            // قائمة الألوان المتاحة للفئات لإعطائها مظهراً جذاباً
+            const colorThemes = [
+                { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-800', dot: 'bg-blue-500', focus: 'focus:ring-blue-500' },
+                { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', dot: 'bg-amber-500', focus: 'focus:ring-amber-500' },
+                { bg: 'bg-green-50', border: 'border-green-100', text: 'text-green-800', dot: 'bg-green-500', focus: 'focus:ring-green-500' },
+                { bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-800', dot: 'bg-purple-500', focus: 'focus:ring-purple-500' },
+                { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-800', dot: 'bg-rose-500', focus: 'focus:ring-rose-500' },
+                { bg: 'bg-teal-50', border: 'border-teal-100', text: 'text-teal-800', dot: 'bg-teal-500', focus: 'focus:ring-teal-500' }
+            ];
+
+            // 1. استرجاع الأصناف أو إعطاء مصفوفة افتراضية أولية
+            let categories = JSON.parse(localStorage.getItem('inventoryCategories')) || [
+                { id: '155', name: 'كراتين فئة 155 جنيه', price: 155, themeIdx: 0 },
+                { id: '150', name: 'كراتين فئة 150 جنيه (الفيت)', price: 150, themeIdx: 1 },
+                { id: '100', name: 'كراتين فئة 100 جنيه', price: 100, themeIdx: 2 },
+                { id: '50', name: 'كراتين فئة 50 جنيه', price: 50, themeIdx: 3 }
+            ];
+
+            // تعيين التاريخ اليومي تلقائياً
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedDate = `${yyyy}-${mm}-${dd}`;
+            
+            dateInput.value = formattedDate;
+            currentDateDisplay.textContent = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(today);
+
+            // بدء التطبيق
+            initApp();
+
+            function initApp() {
+                renderCategoryForms();
+                loadHistory();
+                calculateAll();
+            }
+
+            // توليد حقول المدخلات للأصناف ديناميكياً
+            function renderCategoryForms() {
+                dynamicCategoriesContainer.innerHTML = '';
+                
+                if (categories.length === 0) {
+                    dynamicCategoriesContainer.classList.add('hidden');
+                    noCategoriesAlert.classList.remove('hidden');
+                    return;
+                }
+
+                dynamicCategoriesContainer.classList.remove('hidden');
+                noCategoriesAlert.classList.add('hidden');
+
+                categories.forEach(cat => {
+                    const theme = colorThemes[cat.themeIdx % colorThemes.length];
+                    const catHtml = `
+                        <div class="${theme.bg} p-4 rounded-lg border ${theme.border} transition-all duration-200 hover:shadow-sm">
+                            <h2 class="text-lg font-bold ${theme.text} mb-3 flex items-center">
+                                <span class="w-3 h-3 ${theme.dot} rounded-full ml-2"></span>
+                                ${cat.name}
+                            </h2>
+                            <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 mb-1">رصيد سابق</label>
+                                    <input type="number" id="prev_${cat.id}" value="0" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md ${theme.focus} item-input" data-price="${cat.price}" data-cat="${cat.id}">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 mb-1">وارد اليوم</label>
+                                    <input type="number" id="in_${cat.id}" value="0" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md ${theme.focus} item-input" data-price="${cat.price}" data-cat="${cat.id}">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 mb-1">مرتجع العميل</label>
+                                    <input type="number" id="cust_return_${cat.id}" value="0" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md ${theme.focus} item-input" data-price="${cat.price}" data-cat="${cat.id}">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 mb-1 text-red-600">منصرف (مبيعات)</label>
+                                    <input type="number" id="out_${cat.id}" value="0" min="0" class="w-full px-3 py-2 border border-red-300 rounded-md focus:ring-red-500 focus:border-red-500 item-input" data-price="${cat.price}" data-cat="${cat.id}">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 mb-1 text-orange-600">ارتجاع للمخزن</label>
+                                    <input type="number" id="ret_wh_${cat.id}" value="0" min="0" class="w-full px-3 py-2 border border-orange-300 rounded-md focus:ring-orange-500 focus:border-orange-500 item-input" data-price="${cat.price}" data-cat="${cat.id}">
+                                </div>
+                                <div class="bg-white p-2 rounded-md border border-gray-200 shadow-inner flex flex-col justify-center items-center col-span-2 md:col-span-1">
+                                    <span class="text-xs text-gray-500">الرصيد الحالي</span>
+                                    <span id="bal_${cat.id}" class="text-lg font-bold text-gray-800">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    dynamicCategoriesContainer.insertAdjacentHTML('beforeend', catHtml);
+                });
+
+                // إعادة تفعيل مستمعي الأحداث للحقول الجديدة
+                const newInputs = document.querySelectorAll('.item-input');
+                newInputs.forEach(input => {
+                    input.addEventListener('input', function() {
+                        if (this.value < 0) this.value = 0;
+                        calculateAll();
+                    });
+                    input.addEventListener('focus', function() {
+                        this.select();
+                    });
+                });
+            }
+
+            // الحساب التلقائي لجميع الإجماليات
+            function calculateAll() {
+                let totalItemsOut = 0;
+                let totalSalesValue = 0;
+                let totalCurrentBalance = 0;
+
+                categories.forEach(cat => {
+                    const prevEl = document.getElementById(`prev_${cat.id}`);
+                    const inEl = document.getElementById(`in_${cat.id}`);
+                    const custReturnEl = document.getElementById(`cust_return_${cat.id}`);
+                    const outEl = document.getElementById(`out_${cat.id}`);
+                    const retWhEl = document.getElementById(`ret_wh_${cat.id}`);
+
+                    if (prevEl && inEl && custReturnEl && outEl && retWhEl) {
+                        const prev = parseInt(prevEl.value) || 0;
+                        const inQty = parseInt(inEl.value) || 0;
+                        const custReturn = parseInt(custReturnEl.value) || 0;
+                        const outQty = parseInt(outEl.value) || 0;
+                        const retWh = parseInt(retWhEl.value) || 0;
+                        const price = cat.price;
+
+                        const balance = prev + inQty + custReturn - outQty - retWh;
+                        
+                        const balEl = document.getElementById(`bal_${cat.id}`);
+                        if (balEl) {
+                            balEl.textContent = balance;
+                            
+                            if (balance < 0) {
+                                balEl.classList.remove('text-gray-800');
+                                balEl.classList.add('text-red-600', 'font-extrabold');
+                            } else {
+                                balEl.classList.remove('text-red-600', 'font-extrabold');
+                                balEl.classList.add('text-gray-800');
+                            }
+                        }
+
+                        totalItemsOut += outQty;
+                        totalSalesValue += (outQty * price);
+                        totalCurrentBalance += balance;
+                    }
+                });
+
+                document.getElementById('totalItemsOut').textContent = totalItemsOut;
+                document.getElementById('totalSalesValue').textContent = new Intl.NumberFormat('ar-EG').format(totalSalesValue);
+                document.getElementById('totalCurrentBalance').textContent = totalCurrentBalance;
+            }
+
+            // حفظ الجرد اليومي
+            function saveRecord() {
+                const dateVal = dateInput.value;
+                if (!dateVal) {
+                    showModal("تنبيه", "يرجى اختيار تاريخ الجرد", false);
+                    return;
+                }
+
+                if (categories.length === 0) {
+                    showModal("تنبيه", "لا يمكنك حفظ جرد فارغ دون وجود مجموعات!", false);
+                    return;
+                }
+
+                const record = {
+                    id: Date.now(),
+                    date: dateVal,
+                    items: {},
+                    totalOut: parseInt(document.getElementById('totalItemsOut').textContent),
+                    totalValue: parseInt(document.getElementById('totalSalesValue').textContent.replace(/,/g, ''))
+                };
+
+                let hasNegativeBalance = false;
+
+                categories.forEach(cat => {
+                    const prevEl = document.getElementById(`prev_${cat.id}`);
+                    const inEl = document.getElementById(`in_${cat.id}`);
+                    const custReturnEl = document.getElementById(`cust_return_${cat.id}`);
+                    const outEl = document.getElementById(`out_${cat.id}`);
+                    const retWhEl = document.getElementById(`ret_wh_${cat.id}`);
+
+                    if (prevEl) {
+                        const prev = parseInt(prevEl.value) || 0;
+                        const inQty = parseInt(inEl.value) || 0;
+                        const custReturn = parseInt(custReturnEl.value) || 0;
+                        const outQty = parseInt(outEl.value) || 0;
+                        const retWh = parseInt(retWhEl.value) || 0;
+                        const bal = prev + inQty + custReturn - outQty - retWh;
+
+                        if (bal < 0) hasNegativeBalance = true;
+
+                        record.items[cat.id] = { prev, in: inQty, custReturn, out: outQty, retWh, bal, name: cat.name };
+                    }
+                });
+
+                if (hasNegativeBalance) {
+                     showModal("خطأ في الإدخال", "يوجد رصيد سيارة بالسالب. يرجى مراجعة وتعديل المدخلات بحيث لا يتخطى المنصرف والارتجاع الكمية المتوفرة.", false);
+                     return;
+                }
+
+                let history = JSON.parse(localStorage.getItem('inventoryHistory')) || [];
+                
+                const existingIndex = history.findIndex(r => r.date === dateVal);
+                if (existingIndex >= 0) {
+                    history[existingIndex] = record;
+                } else {
+                    history.push(record);
+                }
+
+                history.sort((a, b) => new Date(b.date) - new Date(a.date));
+                localStorage.setItem('inventoryHistory', JSON.stringify(history));
+
+                showModal("تم الحفظ بنجاح", `تم حفظ جرد يوم ${dateVal} بنجاح في السجل.`, true);
+                loadHistory();
+            }
+
+            // عرض سجلات الجرد السابقة
+            function loadHistory() {
+                const history = JSON.parse(localStorage.getItem('inventoryHistory')) || [];
+                historyTableBody.innerHTML = '';
+                
+                if (history.length === 0) {
+                    historyTableBody.parentElement.classList.add('hidden');
+                    noHistoryMsg.classList.remove('hidden');
+                    return;
+                }
+
+                historyTableBody.parentElement.classList.remove('hidden');
+                noHistoryMsg.classList.add('hidden');
+
+                history.forEach(record => {
+                    const tr = document.createElement('tr');
+                    tr.classList.add('hover:bg-gray-50');
+                    
+                    const d = new Date(record.date);
+                    const dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+
+                    let detailsHTML = `<div class="text-xs text-gray-500 space-y-1">`;
+                    
+                    // استعراض الأصناف المحفوظة في السجل بشكل مرن حتى لو حذف المندوب الفئة لاحقاً
+                    for (const catId in record.items) {
+                        const item = record.items[catId];
+                        const isChg = (item.prev > 0 || item.in > 0 || item.custReturn > 0 || item.out > 0 || item.retWh > 0);
+                        if (isChg) {
+                            detailsHTML += `<div><span class="font-bold text-gray-700">${item.name || 'صنف مباع'}:</span> سابق (${item.prev}) | وارد (${item.in}) | مرتجع عميل (${item.custReturn || 0}) | مبيعات (${item.out}) | مرتجع مخزن (${item.retWh || 0}) | متبقي (${item.bal})</div>`;
+                        }
+                    }
+                    detailsHTML += `</div>`;
+                    if(detailsHTML === `<div class="text-xs text-gray-500 space-y-1"></div>`) detailsHTML = `<span class="text-xs text-gray-400">لا توجد حركة</span>`;
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${dateStr}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.totalOut} كرتونة</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">${new Intl.NumberFormat('ar-EG').format(record.totalValue)} ج.م</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${detailsHTML}</td>
+                    `;
+                    
+                    tr.style.cursor = 'pointer';
+                    tr.addEventListener('click', () => loadRecordToForm(record));
+                    historyTableBody.appendChild(tr);
+                });
+            }
+
+            // استعادة سجل قديم وإدراجه بالخانات لتعديله
+            function loadRecordToForm(record) {
+                dateInput.value = record.date;
+                
+                // نقوم بتهيئة جميع الخانات أولاً بصفر
+                categories.forEach(cat => {
+                    const prevEl = document.getElementById(`prev_${cat.id}`);
+                    if (prevEl) {
+                        document.getElementById(`prev_${cat.id}`).value = 0;
+                        document.getElementById(`in_${cat.id}`).value = 0;
+                        document.getElementById(`cust_return_${cat.id}`).value = 0;
+                        document.getElementById(`out_${cat.id}`).value = 0;
+                        document.getElementById(`ret_wh_${cat.id}`).value = 0;
+                    }
+                });
+
+                // ملء الخانات بناءً على بيانات السجل
+                for (const catId in record.items) {
+                    const savedItem = record.items[catId];
+                    const prevEl = document.getElementById(`prev_${catId}`);
+                    
+                    // إذا كان الصنف مازال متوفراً بالتطبيق، املأ خاناته
+                    if(prevEl) {
+                        document.getElementById(`prev_${catId}`).value = savedItem.prev || 0;
+                        document.getElementById(`in_${catId}`).value = savedItem.in || 0;
+                        document.getElementById(`cust_return_${catId}`).value = savedItem.custReturn || 0;
+                        document.getElementById(`out_${catId}`).value = savedItem.out || 0;
+                        document.getElementById(`ret_wh_${catId}`).value = savedItem.retWh || 0;
+                    }
+                }
+                
+                calculateAll();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            // --- مودال إدارة الأصناف الديناميكية ---
+            
+            manageCategoriesBtn.addEventListener('click', showManageModal);
+            closeManageModalBtn.addEventListener('click', hideManageModal);
+            addFirstCategoryBtn.addEventListener('click', showManageModal);
+
+            function showManageModal() {
+                renderManageList();
+                manageCategoriesModal.classList.remove('hidden');
+                void manageCategoriesModal.offsetWidth;
+                manageCategoriesModal.classList.remove('opacity-0');
+                manageCategoriesModal.querySelector('div').classList.remove('scale-95');
+            }
+
+            function hideManageModal() {
+                manageCategoriesModal.classList.add('opacity-0');
+                manageCategoriesModal.querySelector('div').classList.add('scale-95');
+                setTimeout(() => {
+                    manageCategoriesModal.classList.add('hidden');
+                }, 300);
+            }
+
+            // إنشاء قائمة إدارة الأصناف داخل المودال
+            function renderManageList() {
+                categoriesListContainer.innerHTML = '';
+                
+                if (categories.length === 0) {
+                    categoriesListContainer.innerHTML = `<p class="text-center text-gray-500 py-4 text-sm">لم تقم بإضافة أي أصناف بعد. ابدأ بإضافة صنف بالنموذج أعلاه.</p>`;
+                    return;
+                }
+
+                categories.forEach((cat, idx) => {
+                    const rowHtml = `
+                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200 shadow-xs">
+                            <div class="flex-1">
+                                <input type="text" value="${cat.name}" id="manage_name_${cat.id}" class="w-full px-2 py-1 border border-gray-300 rounded text-sm font-semibold focus:ring-blue-500 focus:border-blue-500" placeholder="اسم الفئة">
+                            </div>
+                            <div class="w-24">
+                                <input type="number" value="${cat.price}" id="manage_price_${cat.id}" min="1" class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-center" placeholder="السعر">
+                            </div>
+                            <button type="button" class="delete-cat-btn text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded" data-id="${cat.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    `;
+                    categoriesListContainer.insertAdjacentHTML('beforeend', rowHtml);
+                });
+
+                // ربط أزرار الحذف
+                document.querySelectorAll('.delete-cat-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.dataset.id;
+                        if(confirm("هل أنت متأكد من حذف هذا الصنف بالكامل؟ سيختفي الصنف الحالي من حقول التعبئة، ولكن تفاصيل سجلاته القديمة ستبقى محفوظة بالسجل.")) {
+                            categories = categories.filter(c => c.id !== id);
+                            renderManageList();
+                        }
+                    });
+                });
+            }
+
+            // إضافة فئة جديدة للكراتين
+            addCategoryForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const name = newCatName.value.trim();
+                const price = parseInt(newCatPrice.value) || 0;
+                
+                if (!name || price <= 0) return;
+
+                // توليد ID فريد
+                const id = 'cat_' + Date.now();
+                const themeIdx = categories.length;
+
+                categories.push({ id, name, price, themeIdx });
+                
+                newCatName.value = '';
+                newCatPrice.value = '';
+
+                renderManageList();
+            });
+
+            // حفظ الترتيب والمسميات والأسعار المعدلة للمجموعات
+            saveCategoriesOrderBtn.addEventListener('click', () => {
+                let anyChanges = false;
+                
+                categories.forEach(cat => {
+                    const nameEl = document.getElementById(`manage_name_${cat.id}`);
+                    const priceEl = document.getElementById(`manage_price_${cat.id}`);
+                    
+                    if (nameEl && priceEl) {
+                        const updatedName = nameEl.value.trim();
+                        const updatedPrice = parseInt(priceEl.value) || 0;
+                        
+                        if (updatedName && updatedPrice > 0) {
+                            if (cat.name !== updatedName || cat.price !== updatedPrice) {
+                                cat.name = updatedName;
+                                cat.price = updatedPrice;
+                                anyChanges = true;
+                            }
+                        }
+                    }
+                });
+
+                localStorage.setItem('inventoryCategories', JSON.stringify(categories));
+                initApp();
+                hideManageModal();
+                showModal("تم الحفظ", "تم تحديث مسميات الفئات والأسعار بنجاح.", true);
+            });
+
+            // --- المودالات الإشعارية التفاعلية ---
+
+            function showModal(title, message, isSuccess) {
+                const titleEl = document.getElementById('modalTitle');
+                const msgEl = document.getElementById('modalMessage');
+                const iconSvg = document.querySelector('#notificationContent svg');
+                const iconContainer = iconSvg.parentElement;
+
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+
+                if (isSuccess) {
+                    iconContainer.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4';
+                    iconSvg.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />`;
+                    iconSvg.className = 'h-6 w-6 text-green-600';
+                    closeModalBtn.className = 'inline-flex justify-center w-full rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm';
+                } else {
+                    iconContainer.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4';
+                    iconSvg.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />`;
+                    iconSvg.className = 'h-6 w-6 text-red-600';
+                    closeModalBtn.className = 'inline-flex justify-center w-full rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm';
+                }
+
+                modal.classList.remove('hidden');
+                void modal.offsetWidth;
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }
+
+            function hideModal() {
+                modal.classList.add('opacity-0');
+                modalContent.classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+
+            // PWA Installer logic
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                pwaInstallBanner.classList.remove('hidden');
+                pwaInstallBanner.classList.add('flex');
+            });
+
+            pwaInstallBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                    pwaInstallBanner.classList.add('hidden');
+                }
+            });
+
+            pwaDismissBtn.addEventListener('click', () => {
+                pwaInstallBanner.classList.add('hidden');
+            });
+
+            closeModalBtn.addEventListener('click', hideModal);
+
+            window.alert = function(msg) {
+                showModal("تنبيه", msg, false);
+            };
+            window.confirm = function(msg) {
+               return window.originalConfirm ? window.originalConfirm(msg) : true;
+            };
+            window.originalConfirm = window.confirm;
+        });
+    </script>
+</body>
+</html>
