@@ -1,0 +1,17 @@
+{
+  "name": "placeholderبرنامج جرد السيارات البيعية.",
+  "short_name": "placeholderجردي",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='#2563eb'&gt;&lt;rect width='512' height='512' rx='100'/&gt;&lt;path d='M120 140h272v232H120z' fill='#fff'/&gt;&lt;circle cx='256' cy='256' r='60' fill='#2563eb'/&gt;&lt;/svg&gt;",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
