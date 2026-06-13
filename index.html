@@ -1,63 +1,136 @@
-<script>
-    // PWA - تسجيل عامل الخدمة بطريقة مباشرة متوافقة مع أمن المتصفحات ومنصات الاستضافة
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            // إنشاء كود عامل الخدمة كملف نصي تنفيذي مباشر
-            const swCode = `
-                const CACHE_NAME = 'inventory-pwa-v5';
-                const ASSETS = [
-                    './',
-                    './index.html',
-                    'https://cdn.tailwindcss.com',
-                    'https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;800&display=swap'
-                ];
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برنامج جرد سيارة المبيعات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
 
-                self.addEventListener('install', (e) => {
-                    e.waitUntil(
-                        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-                    );
-                });
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <header class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-lg p-6 mb-6 text-white relative overflow-hidden">
+            <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-extrabold mb-1">نظام جرد سيارة المبيعات الذكي</h1>
+                    <p class="text-blue-100 text-sm font-medium" id="currentDateDisplay">جاري تحميل التاريخ...</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/20">
+                        <label for="recordDate" class="block text-xs text-blue-200 mb-1 font-semibold">تاريخ الجرد الحالي</label>
+                        <input type="date" id="recordDate" class="bg-transparent text-white font-bold outline-none text-sm cursor-pointer [color-scheme:dark]">
+                    </div>
+                    <button id="manageCategoriesBtn" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
+                        ⚙️ إدارة الأصناف
+                    </button>
+                </div>
+            </div>
+        </header>
 
-                self.addEventListener('activate', (e) => {
-                    e.waitUntil(
-                        caches.keys().then((keys) => Promise.all(
-                            keys.map((key) => { if (key !== CACHE_NAME) return caches.delete(key); })
-                        ))
-                    );
-                });
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">إجمالي الكراتين المباعة</p>
+                    <h3 class="text-3xl font-extrabold text-blue-600" id="totalItemsOut">0</h3>
+                </div>
+                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl text-2xl">📦</div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">إجمالي قيمة المبيعات</p>
+                    <h3 class="text-3xl font-extrabold text-green-600"><span id="totalSalesValue">0</span> <span class="text-sm font-bold">ج.م</span></h3>
+                </div>
+                <div class="p-3 bg-green-50 text-green-600 rounded-xl text-2xl">💰</div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">إجمالي رصيد السيارة الحالي</p>
+                    <h3 class="text-3xl font-extrabold text-gray-800" id="totalCurrentBalance">0</h3>
+                </div>
+                <div class="p-3 bg-gray-50 text-gray-600 rounded-xl text-2xl">🚚</div>
+            </div>
+        </section>
 
-                self.addEventListener('fetch', (e) => {
-                    if (e.request.method !== 'GET') return;
-                    e.respondWith(
-                        caches.match(e.request).then((cached) => {
-                            return cached || fetch(e.request).then((res) => {
-                                if (res && res.status === 200 && e.request.url.startsWith('http')) {
-                                    const clone = res.clone();
-                                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-                                }
-                                return res;
-                            }).catch(() => caches.match('./index.html'));
-                        })
-                    );
-                });
-            `;
+        <main class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-extrabold text-gray-800 flex items-center gap-2">📝 إدخال حركات الجرد اليومية</h2>
+                <button id="saveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2">
+                    💾 حفظ جرد اليوم
+                </button>
+            </div>
 
-            try {
-                const blob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                navigator.serviceWorker.register(swUrl)
-                    .then(() => console.log('PWA Registered'))
-                    .catch(() => {
-                        // حل بديل فوري إذا رفض المتصفح الـ Blob: تشغيل التطبيق بدون PWA لتفادي الشاشة البيضاء
-                        console.log('PWA active via standard mode');
-                    });
-            } catch (err) {
-                console.log('PWA bypass active');
-            }
-        });
-    }
+            <div id="dynamicCategoriesContainer" class="space-y-4">
+                </div>
 
-    // منطق البرنامج الفعلي المستقر
+            <div id="noCategoriesAlert" class="hidden text-center py-12">
+                <p class="text-gray-500 font-medium mb-4">لا توجد أصناف مضافة حالياً في النظام.</p>
+                <button id="addFirstCategoryBtn" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm">إضافة أول صنف الآن</button>
+            </div>
+        </main>
+
+        <section class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <h2 class="text-xl font-extrabold text-gray-800">📊 سجلات الجرد السابقة المعتمدة</h2>
+                <button id="clearHistoryBtn" class="text-red-500 hover:text-red-700 font-bold text-sm flex items-center gap-1">
+                    🗑️ مسح السجل بالكامل
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-right border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 text-sm font-bold border-b border-gray-200">
+                            <th class="px-6 py-3.5">التاريخ</th>
+                            <th class="px-6 py-3.5">الكمية المباعة</th>
+                            <th class="px-6 py-3.5">قيمة المبيعات</th>
+                            <th class="px-6 py-3.5">تفاصيل كميات الأصناف والمتبقي</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody" class="divide-y divide-gray-100 text-sm">
+                        </tbody>
+                </table>
+                <div id="noHistoryMsg" class="text-center py-8 text-gray-400 font-medium hidden">لا توجد سجلات محفوظة سابقة حتى الآن.</div>
+            </div>
+        </section>
+    </div>
+
+    <div id="manageCategoriesModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col transform scale-95 transition-transform duration-300">
+            <div class="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50 rounded-t-2xl">
+                <h3 class="text-lg font-extrabold text-gray-800">⚙️ إدارة وتعديل أصناف المنتجات</h3>
+                <button id="closeManageModalBtn" class="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+            </div>
+            <div class="p-5 overflow-y-auto flex-1 space-y-4">
+                <form id="addCategoryForm" class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3">
+                    <h4 class="text-xs font-bold text-blue-700 uppercase">إضافة صنف جديد بالنظام:</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input type="text" id="newCatName" placeholder="اسم الصنف (مثال: فئة 100)" required class="px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="newCatPrice" placeholder="سعر الكرتونة" required min="1" class="px-3 py-2 border rounded-lg text-sm text-center outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-sm transition-colors">➕ إضافة الصنف لقائمة الجرد</button>
+                </form>
+                <div class="space-y-2" id="categoriesListContainer">
+                    </div>
+            </div>
+            <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2 rounded-b-2xl">
+                <button id="saveCategoriesOrderBtn" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-xl font-bold text-sm transition-colors">💾 حفظ التعديلات وإعادة البناء</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div id="notificationContent" class="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-xl transform scale-95 transition-transform duration-300">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4"></div>
+            <h3 class="text-lg font-extrabold text-gray-900 mb-2" id="modalTitle"></h3>
+            <p class="text-sm text-gray-500 mb-6" id="modalMessage"></p>
+            <button id="closeModalBtn" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">موافق</button>
+        </div>
+    </div>
+
+    <script>
     document.addEventListener('DOMContentLoaded', () => {
         const dateInput = document.getElementById('recordDate');
         const currentDateDisplay = document.getElementById('currentDateDisplay');
@@ -81,11 +154,6 @@
         const modal = document.getElementById('notificationModal');
         const modalContent = document.getElementById('notificationContent');
         const closeModalBtn = document.getElementById('closeModalBtn');
-
-        const pwaInstallBanner = document.getElementById('pwaInstallBanner');
-        const pwaInstallBtn = document.getElementById('pwaInstallBtn');
-        const pwaDismissBtn = document.getElementById('pwaDismissBtn');
-        let deferredPrompt;
 
         const colorThemes = [
             { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-800', dot: 'bg-blue-500', focus: 'focus:ring-blue-500' },
@@ -291,272 +359,4 @@
         function saveRecord() {
             if (!dateInput) return;
             const dateVal = dateInput.value;
-            if (!dateVal) {
-                showModal("تنبيه", "يرجى اختيار تاريخ الجرد", false);
-                return;
-            }
-
-            if (categories.length === 0) {
-                showModal("تنبيه", "لا يمكنك حفظ جرد فارغ!", false);
-                return;
-            }
-
-            const record = {
-                id: Date.now(),
-                date: dateVal,
-                items: {},
-                totalOut: parseInt(document.getElementById('totalItemsOut')?.textContent || 0),
-                totalValue: parseInt(document.getElementById('totalSalesValue')?.textContent.replace(/,/g, '') || 0)
-            };
-
-            let hasNegativeBalance = false;
-
-            categories.forEach(cat => {
-                const prevEl = document.getElementById(`prev_${cat.id}`);
-                const inEl = document.getElementById(`in_${cat.id}`);
-                const custReturnEl = document.getElementById(`cust_return_${cat.id}`);
-                const outEl = document.getElementById(`out_${cat.id}`);
-                const retWhEl = document.getElementById(`ret_wh_${cat.id}`);
-
-                if (prevEl) {
-                    const prev = parseInt(prevEl.value) || 0;
-                    const inQty = parseInt(inEl.value) || 0;
-                    const custReturn = parseInt(custReturnEl.value) || 0;
-                    const outQty = parseInt(outEl.value) || 0;
-                    const retWh = parseInt(retWhEl.value) || 0;
-                    const bal = prev + inQty + custReturn - outQty - retWh;
-
-                    if (bal < 0) hasNegativeBalance = true;
-                    record.items[cat.id] = { prev, in: inQty, custReturn, out: outQty, retWh, bal, name: cat.name };
-                }
-            });
-
-            if (hasNegativeBalance) {
-                 showModal("خطأ في الإدخال", "يوجد رصيد سيارة بالسالب. يرجى مراجعة وتعديل المدخلات.", false);
-                 return;
-            }
-
-            let history = JSON.parse(localStorage.getItem('inventoryHistory')) || [];
-            const existingIndex = history.findIndex(r => r.date === dateVal);
-            
-            if (existingIndex >= 0) {
-                history[existingIndex] = record;
-            } else {
-                history.push(record);
-            }
-
-            history.sort((a, b) => new Date(a.date) - new Date(b.date));
-            localStorage.setItem('inventoryHistory', JSON.stringify(history));
-            showModal("تم الحفظ بنجاح", "تم حفظ جرد اليوم وتحديث الأرصدة بنجاح.", true);
-            loadHistory();
-        }
-
-        if (saveBtn) saveBtn.addEventListener('click', saveRecord);
-
-        function loadHistory() {
-            if (!historyTableBody) return;
-            const history = JSON.parse(localStorage.getItem('inventoryHistory')) || [];
-            historyTableBody.innerHTML = '';
-
-            if (history.length === 0) {
-                if (noHistoryMsg) noHistoryMsg.classList.remove('hidden');
-                return;
-            }
-            if (noHistoryMsg) noHistoryMsg.classList.add('hidden');
-
-            const displayHistory = [...history].reverse();
-
-            displayHistory.forEach(record => {
-                let itemsDetailsHtml = '';
-                for (const id in record.items) {
-                    const item = record.items[id];
-                    itemsDetailsHtml += `
-                        <div class="mb-1 border-b border-gray-100 pb-1 last:border-0">
-                            <span class="font-bold text-gray-700">${item.name}:</span> 
-                            <span>(سابق: ${item.prev} | وارد: ${item.in} | مبيعات: ${item.out} | متبقي: <b class="text-blue-600">${item.bal}</b>)</span>
-                        </div>
-                    `;
-                }
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition-colors";
-                tr.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap font-bold text-gray-900">${record.date}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-600">${record.totalOut} كرتونة</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-green-600 font-bold">${new Intl.NumberFormat('ar-EG').format(record.totalValue)} ج.م</td>
-                    <td class="px-6 py-4 text-xs text-gray-600">${itemsDetailsHtml}</td>
-                `;
-                historyTableBody.appendChild(tr);
-            });
-        }
-
-        if (clearHistoryBtn) {
-            clearHistoryBtn.addEventListener('click', () => {
-                if (confirm('هل أنت متأكد من مسح جميع سجلات الجرد السابقة؟')) {
-                    localStorage.removeItem('inventoryHistory');
-                    loadHistory();
-                    applyCarriedOverBalances();
-                    calculateAll();
-                    showModal("تم الحذف", "تم مسح السجل بنجاح.", true);
-                }
-            });
-        }
-
-        function showModal(title, message, isSuccess = true) {
-            if (!modal || !modalContent) return;
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalMessage').textContent = message;
-            
-            const iconContainer = modal.querySelector('.rounded-full');
-            if (iconContainer) {
-                if (isSuccess) {
-                    iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4";
-                    iconContainer.innerHTML = `<svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
-                } else {
-                    iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4";
-                    iconContainer.innerHTML = `<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
-                }
-            }
-
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-            }, 10);
-        }
-
-        if (closeModalBtn) {
-            closeModalBtn.addEventListener('click', () => {
-                modal.classList.add('opacity-0');
-                modalContent.classList.add('scale-95');
-                setTimeout(() => modal.classList.add('hidden'), 300);
-            });
-        }
-
-        if (manageCategoriesBtn) manageCategoriesBtn.addEventListener('click', openManageModal);
-        if (addFirstCategoryBtn) addFirstCategoryBtn.addEventListener('click', openManageModal);
-        if (closeManageModalBtn) closeManageModalBtn.addEventListener('click', closeManageModal);
-
-        function openManageModal() {
-            if (!manageCategoriesModal) return;
-            renderManageCategoriesList();
-            manageCategoriesModal.classList.remove('hidden');
-            setTimeout(() => {
-                manageCategoriesModal.classList.remove('opacity-0');
-                manageCategoriesModal.querySelector('.transform')?.classList.remove('scale-95');
-            }, 10);
-        }
-
-        function closeManageModal() {
-            if (!manageCategoriesModal) return;
-            manageCategoriesModal.classList.add('opacity-0');
-            manageCategoriesModal.querySelector('.transform')?.classList.add('scale-95');
-            setTimeout(() => manageCategoriesModal.classList.add('hidden'), 300);
-        }
-
-        function renderManageCategoriesList() {
-            if (!categoriesListContainer) return;
-            categoriesListContainer.innerHTML = '';
-            categories.forEach((cat) => {
-                const itemHtml = `
-                    <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <span class="text-gray-400 font-bold text-lg">☰</span>
-                        <input type="text" value="${cat.name}" id="editName_${cat.id}" class="flex-1 px-2 py-1 text-sm border rounded outline-none">
-                        <input type="number" value="${cat.price}" id="editPrice_${cat.id}" class="w-20 px-2 py-1 text-sm border rounded text-center">
-                        <span class="text-xs text-gray-400">ج.م</span>
-                        <button type="button" class="text-red-500 hover:text-red-700 p-1 delete-cat-btn" data-id="${cat.id}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </div>
-                `;
-                categoriesListContainer.insertAdjacentHTML('beforeend', itemHtml);
-            });
-
-            document.querySelectorAll('.delete-cat-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const idToDelete = this.getAttribute('data-id');
-                    if(confirm('هل أنت متأكد من حذف هذا الصنف؟')) {
-                        categories = categories.filter(c => c.id !== idToDelete);
-                        renderManageCategoriesList();
-                    }
-                });
-            });
-        }
-
-        if (addCategoryForm) {
-            addCategoryForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                const name = newCatName.value.trim();
-                const price = parseInt(newCatPrice.value);
-                if(!name || !price) return;
-
-                categories.push({
-                    id: String(Date.now()),
-                    name: name,
-                    price: price,
-                    themeIdx: Math.floor(Math.random() * colorThemes.length)
-                });
-
-                newCatName.value = '';
-                newCatPrice.value = '';
-                renderManageCategoriesList();
-            });
-        }
-
-        if (saveCategoriesOrderBtn) {
-            saveCategoriesOrderBtn.addEventListener('click', () => {
-                let updatedCategories = [];
-                categories.forEach(cat => {
-                    const nameInp = document.getElementById(`editName_${cat.id}`);
-                    const priceInp = document.getElementById(`editPrice_${cat.id}`);
-                    if(nameInp && priceInp) {
-                        updatedCategories.push({
-                            id: cat.id,
-                            name: nameInp.value.trim() || cat.name,
-                            price: parseInt(priceInp.value) || cat.price,
-                            themeIdx: cat.themeIdx
-                        });
-                    } else {
-                        updatedCategories.push(cat);
-                    }
-                });
-
-                categories = updatedCategories;
-                localStorage.setItem('inventoryCategories', JSON.stringify(categories));
-                renderCategoryForms();
-                applyCarriedOverBalances();
-                calculateAll();
-                closeManageModal();
-                showModal("تم التحديث", "تم تحديث الأصناف بنجاح.", true);
-            });
-        }
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            if (pwaInstallBanner) {
-                pwaInstallBanner.classList.remove('hidden');
-                pwaInstallBanner.classList.add('flex');
-            }
-        });
-
-        if (pwaInstallBtn) {
-            pwaInstallBtn.addEventListener('click', async () => {
-                if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted' && pwaInstallBanner) pwaInstallBanner.classList.add('hidden');
-                    deferredPrompt = null;
-                }
-            });
-        }
-
-        if (pwaDismissBtn) {
-            pwaDismissBtn.addEventListener('click', () => {
-                if (pwaInstallBanner) pwaInstallBanner.classList.add('hidden');
-            });
-        }
-    });
-</script>
+            if (!dateVal
