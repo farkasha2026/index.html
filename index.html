@@ -1,12 +1,14 @@
 <script>
-    // PWA - تسجيل عامل الخدمة (Service Worker) لتأكيد العمل أوفلاين 100%
+    // PWA - تسجيل عامل الخدمة بطريقة آمنة لا تسبب انهيار المتصفح
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            const swCode = `
-                const CACHE_NAME = 'inventory-pwa-v3';
+            // كود عامل الخدمة مخزن بنص نظيف لتجنب مشاكل علامات التنصيص المتقاطعة
+            const swContent = `
+                const CACHE_NAME = 'inventory-pwa-v4';
                 const ASSETS = [
                     '/',
-                    window.location.pathname,
+                    '/sales-car-inventory/',
+                    '/sales-car-inventory/index.html',
                     'https://cdn.tailwindcss.com',
                     'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap'
                 ];
@@ -14,7 +16,7 @@
                 self.addEventListener('install', (e) => {
                     e.waitUntil(
                         caches.open(CACHE_NAME).then((cache) => {
-                            return cache.addAll(ASSETS).catch(() => {});
+                            return cache.addAll(ASSETS).catch((err) => console.log('Cache add error ignored'));
                         })
                     );
                 });
@@ -24,9 +26,7 @@
                         caches.keys().then((keys) => {
                             return Promise.all(
                                 keys.map((key) => {
-                                    if (key !== CACHE_NAME) {
-                                        return caches.delete(key);
-                                    }
+                                    if (key !== CACHE_NAME) return caches.delete(key);
                                 })
                             );
                         })
@@ -34,38 +34,34 @@
                 });
 
                 self.addEventListener('fetch', (e) => {
+                    if (e.request.method !== 'GET') return;
                     e.respondWith(
-                        caches.match(e.request).then((cachedResponse) => {
-                            if (cachedResponse) return cachedResponse;
-                            return fetch(e.request).then((response) => {
-                                if (e.request.method === 'GET' && e.request.url.startsWith('http')) {
-                                    const responseClone = response.clone();
-                                    caches.open(CACHE_NAME).then((cache) => {
-                                        cache.put(e.request, responseClone);
-                                    });
+                        caches.match(e.request).then((cached) => {
+                            if (cached) return cached;
+                            return fetch(e.request).then((res) => {
+                                if (res && res.status === 200 && e.request.url.startsWith('http')) {
+                                    const clone = res.clone();
+                                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
                                 }
-                                return response;
-                            }).catch(() => {
-                                if (e.request.mode === 'navigate') {
-                                    return caches.match('/');
-                                }
-                            });
+                                return res;
+                            }).catch(() => caches.match('/'));
                         })
                     );
                 });
             `;
 
-            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const blob = new Blob([swContent], { type: 'application/javascript' });
             const swUrl = URL.createObjectURL(blob);
             
             navigator.serviceWorker.register(swUrl)
-                .then(reg => console.log('PWA Service Worker registered successfully!'))
-                .catch(err => console.log('Service Worker registration failed: ', err));
+                .then(reg => console.log('PWA OK'))
+                .catch(err => console.log('PWA ERR', err));
         });
     }
 
+    // انتهاء كود الـ PWA وبداية منطق البرنامج الفعلي
     document.addEventListener('DOMContentLoaded', () => {
-        // Elements
+        // الروابط البرمجية للعناصر
         const dateInput = document.getElementById('recordDate');
         const currentDateDisplay = document.getElementById('currentDateDisplay');
         const saveBtn = document.getElementById('saveBtn');
@@ -76,7 +72,7 @@
         const noCategoriesAlert = document.getElementById('noCategoriesAlert');
         const addFirstCategoryBtn = document.getElementById('addFirstCategoryBtn');
         
-        // Manage Modal Elements
+        // عناصر مودال الإدارة
         const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
         const manageCategoriesModal = document.getElementById('manageCategoriesModal');
         const closeManageModalBtn = document.getElementById('closeManageModalBtn');
@@ -86,12 +82,12 @@
         const categoriesListContainer = document.getElementById('categoriesListContainer');
         const saveCategoriesOrderBtn = document.getElementById('saveCategoriesOrderBtn');
 
-        // Modal Elements
+        // عناصر مودال الإشعارات
         const modal = document.getElementById('notificationModal');
         const modalContent = document.getElementById('notificationContent');
         const closeModalBtn = document.getElementById('closeModalBtn');
 
-        // PWA Installation Banner
+        // عناصر بنر الـ PWA
         const pwaInstallBanner = document.getElementById('pwaInstallBanner');
         const pwaInstallBtn = document.getElementById('pwaInstallBtn');
         const pwaDismissBtn = document.getElementById('pwaDismissBtn');
@@ -113,42 +109,44 @@
             { id: '50', name: 'كراتين فئة 50 جنيه', price: 50, themeIdx: 3 }
         ];
 
-        // تعيين التاريخ اليومي تلقائياً
+        // تعيين تاريخ اليوم تلقائياً عند الفتح
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
-        const formattedDate = `${yyyy}-${mm}-${dd}`;
-        
-        dateInput.value = formattedDate;
-        updateDateDisplay(today);
+        if (dateInput) {
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+            updateDateDisplay(today);
+        }
 
-        // بدء التطبيق
+        // تشغيل التطبيق بالترتيب الصحيح
         initApp();
 
         function initApp() {
             renderCategoryForms();
             loadHistory();
-            applyCarriedOverBalances(); // تطبيق الترحيل الآلي للأرصدة
+            applyCarriedOverBalances();
             calculateAll();
         }
 
-        // مستمع لحدث تغيير التاريخ لجلب أرصدة اليوم السابق الخاصة بالتاريخ الجديد
-        dateInput.addEventListener('change', function() {
-            const selectedDate = new Date(this.value);
-            if(!isNaN(selectedDate)) {
-                updateDateDisplay(selectedDate);
-            }
-            resetFormInputs(); // تصفير الحقول أولاً
-            applyCarriedOverBalances(); // سحب الأرصدة المرحلية للتاريخ الجديد
-            calculateAll();
-        });
+        if (dateInput) {
+            dateInput.addEventListener('change', function() {
+                const selectedDate = new Date(this.value);
+                if(!isNaN(selectedDate)) {
+                    updateDateDisplay(selectedDate);
+                }
+                resetFormInputs();
+                applyCarriedOverBalances();
+                calculateAll();
+            });
+        }
 
         function updateDateDisplay(dateObj) {
-            currentDateDisplay.textContent = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(dateObj);
+            if (currentDateDisplay) {
+                currentDateDisplay.textContent = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(dateObj);
+            }
         }
 
-        // تصفير كافة المدخلات عند تغيير التاريخ
         function resetFormInputs() {
             categories.forEach(cat => {
                 ['prev_', 'in_', 'cust_return_', 'out_', 'ret_wh_'].forEach(prefix => {
@@ -158,15 +156,15 @@
             });
         }
 
-        // دالة الترحيل الذكي: تبحث عن جرد اليوم السابق وتضعه في "الرصيد السابق"
+        // دالة الترحيل التلقائي الذكية للأرصدة السابقة
         function applyCarriedOverBalances() {
+            if (!dateInput) return;
             const currentDateVal = dateInput.value;
             if (!currentDateVal) return;
 
             const history = JSON.parse(localStorage.getItem('inventoryHistory')) || [];
             if (history.length === 0) return;
 
-            // حساب تاريخ اليوم السابق للملف المختار
             const currentParts = currentDateVal.split('-');
             const currentObj = new Date(currentParts[0], currentParts[1] - 1, currentParts[2]);
             currentObj.setDate(currentObj.getDate() - 1);
@@ -176,14 +174,12 @@
             const prevD = String(currentObj.getDate()).padStart(2, '0');
             const targetPreviousDateStr = `${prevY}-${prevM}-${prevD}`;
 
-            // البحث عن جرد اليوم السابق في السجل
             const previousRecord = history.find(r => r.date === targetPreviousDateStr);
 
             categories.forEach(cat => {
                 const prevInputEl = document.getElementById(`prev_${cat.id}`);
                 if (prevInputEl) {
                     if (previousRecord && previousRecord.items && previousRecord.items[cat.id]) {
-                        // إذا وُجد جرد لليوم السابق، يتم ترحيل رصيده الحالي (bal) ليصبح الرصيد السابق اليوم
                         prevInputEl.value = previousRecord.items[cat.id].bal || 0;
                     } else {
                         prevInputEl.value = 0;
@@ -192,18 +188,18 @@
             });
         }
 
-        // توليد حقول المدخلات للأصناف ديناميكياً
         function renderCategoryForms() {
+            if (!dynamicCategoriesContainer) return;
             dynamicCategoriesContainer.innerHTML = '';
             
             if (categories.length === 0) {
                 dynamicCategoriesContainer.classList.add('hidden');
-                noCategoriesAlert.classList.remove('hidden');
+                if (noCategoriesAlert) noCategoriesAlert.classList.remove('hidden');
                 return;
             }
 
             dynamicCategoriesContainer.classList.remove('hidden');
-            noCategoriesAlert.classList.add('hidden');
+            if (noCategoriesAlert) noCategoriesAlert.classList.add('hidden');
 
             categories.forEach(cat => {
                 const theme = colorThemes[cat.themeIdx % colorThemes.length];
@@ -244,8 +240,7 @@
                 dynamicCategoriesContainer.insertAdjacentHTML('beforeend', catHtml);
             });
 
-            const newInputs = document.querySelectorAll('.item-input');
-            newInputs.forEach(input => {
+            document.querySelectorAll('.item-input').forEach(input => {
                 input.addEventListener('input', function() {
                     if (this.value < 0) this.value = 0;
                     calculateAll();
@@ -256,7 +251,6 @@
             });
         }
 
-        // الحساب التلقائي لجميع الإجماليات
         function calculateAll() {
             let totalItemsOut = 0;
             let totalSalesValue = 0;
@@ -275,36 +269,36 @@
                     const custReturn = parseInt(custReturnEl.value) || 0;
                     const outQty = parseInt(outEl.value) || 0;
                     const retWh = parseInt(retWhEl.value) || 0;
-                    const price = cat.price;
 
                     const balance = prev + inQty + custReturn - outQty - retWh;
-                    
                     const balEl = document.getElementById(`bal_${cat.id}`);
+                    
                     if (balEl) {
                         balEl.textContent = balance;
-                        
                         if (balance < 0) {
-                            balEl.classList.remove('text-gray-800');
-                            balEl.classList.add('text-red-600', 'font-extrabold');
+                            balEl.className = "text-lg font-extrabold text-red-600";
                         } else {
-                            balEl.classList.remove('text-red-600', 'font-extrabold');
-                            balEl.classList.add('text-gray-800');
+                            balEl.className = "text-lg font-bold text-gray-800";
                         }
                     }
 
                     totalItemsOut += outQty;
-                    totalSalesValue += (outQty * price);
+                    totalSalesValue += (outQty * cat.price);
                     totalCurrentBalance += balance;
                 }
             });
 
-            document.getElementById('totalItemsOut').textContent = totalItemsOut;
-            document.getElementById('totalSalesValue').textContent = new Intl.NumberFormat('ar-EG').format(totalSalesValue);
-            document.getElementById('totalCurrentBalance').textContent = totalCurrentBalance;
+            const tOut = document.getElementById('totalItemsOut');
+            const tVal = document.getElementById('totalSalesValue');
+            const tBal = document.getElementById('totalCurrentBalance');
+
+            if (tOut) tOut.textContent = totalItemsOut;
+            if (tVal) tVal.textContent = new Intl.NumberFormat('ar-EG').format(totalSalesValue);
+            if (tBal) tBal.textContent = totalCurrentBalance;
         }
 
-        // حفظ الجرد اليومي
         function saveRecord() {
+            if (!dateInput) return;
             const dateVal = dateInput.value;
             if (!dateVal) {
                 showModal("تنبيه", "يرجى اختيار تاريخ الجرد", false);
@@ -312,7 +306,7 @@
             }
 
             if (categories.length === 0) {
-                showModal("تنبيه", "لا يمكنك حفظ جرد فارغ دون وجود مجموعات!", false);
+                showModal("تنبيه", "لا يمكنك حفظ جرد فارغ!", false);
                 return;
             }
 
@@ -320,8 +314,8 @@
                 id: Date.now(),
                 date: dateVal,
                 items: {},
-                totalOut: parseInt(document.getElementById('totalItemsOut').textContent),
-                totalValue: parseInt(document.getElementById('totalSalesValue').textContent.replace(/,/g, ''))
+                totalOut: parseInt(document.getElementById('totalItemsOut')?.textContent || 0),
+                totalValue: parseInt(document.getElementById('totalSalesValue')?.textContent.replace(/,/g, '') || 0)
             };
 
             let hasNegativeBalance = false;
@@ -342,47 +336,43 @@
                     const bal = prev + inQty + custReturn - outQty - retWh;
 
                     if (bal < 0) hasNegativeBalance = true;
-
                     record.items[cat.id] = { prev, in: inQty, custReturn, out: outQty, retWh, bal, name: cat.name };
                 }
             });
 
             if (hasNegativeBalance) {
-                 showModal("خطأ في الإدخال", "يوجد رصيد سيارة بالسالب. يرجى مراجعة وتعديل المدخلات بحيث لا يتخطى المنصرف والارتجاع الكمية المتوفرة.", false);
+                 showModal("خطأ في الإدخال", "يوجد رصيد سيارة بالسالب. يرجى مراجعة وتعديل المدخلات.", false);
                  return;
             }
 
             let history = JSON.parse(localStorage.getItem('inventoryHistory')) || [];
-            
             const existingIndex = history.findIndex(r => r.date === dateVal);
+            
             if (existingIndex >= 0) {
                 history[existingIndex] = record;
             } else {
                 history.push(record);
             }
 
-            // ترتيب السجلات تصاعدياً حسب التاريخ لضمان دقة عملية الترحيل اللاحقة
             history.sort((a, b) => new Date(a.date) - new Date(b.date));
-
             localStorage.setItem('inventoryHistory', JSON.stringify(history));
             showModal("تم الحفظ بنجاح", "تم حفظ جرد اليوم وتحديث الأرصدة بنجاح.", true);
             loadHistory();
         }
 
-        saveBtn.addEventListener('click', saveRecord);
+        if (saveBtn) saveBtn.addEventListener('click', saveRecord);
 
-        // تحميل وعرض السجل السابق
         function loadHistory() {
+            if (!historyTableBody) return;
             const history = JSON.parse(localStorage.getItem('inventoryHistory')) || [];
             historyTableBody.innerHTML = '';
 
             if (history.length === 0) {
-                noHistoryMsg.classList.remove('hidden');
+                if (noHistoryMsg) noHistoryMsg.classList.remove('hidden');
                 return;
             }
-            noHistoryMsg.classList.add('hidden');
+            if (noHistoryMsg) noHistoryMsg.classList.add('hidden');
 
-            // لعرض السجل من الأحدث للأقدم للمستخدم
             const displayHistory = [...history].reverse();
 
             displayHistory.forEach(record => {
@@ -392,7 +382,7 @@
                     itemsDetailsHtml += `
                         <div class="mb-1 border-b border-gray-100 pb-1 last:border-0">
                             <span class="font-bold text-gray-700">${item.name}:</span> 
-                            <span>(سابق: ${item.prev} | وارد: ${item.in} | مبيعات: ${item.out} | متبقي بالسيارة: <b class="text-blue-600">${item.bal}</b>)</span>
+                            <span>(سابق: ${item.prev} | وارد: ${item.in} | مبيعات: ${item.out} | متبقي: <b class="text-blue-600">${item.bal}</b>)</span>
                         </div>
                     `;
                 }
@@ -409,29 +399,32 @@
             });
         }
 
-        // مسح السجل السابق
-        clearHistoryBtn.addEventListener('click', () => {
-            if (confirm('هل أنت متأكد من مسح جميع سجلات الجرد السابقة؟ لا يمكن التراجع عن هذا الإجراء.')) {
-                localStorage.removeItem('inventoryHistory');
-                loadHistory();
-                applyCarriedOverBalances();
-                calculateAll();
-                showModal("تم الحذف", "تم مسح السجل التاريخي بنجاح.", true);
-            }
-        });
+        if (clearHistoryBtn) {
+            clearHistoryBtn.addEventListener('click', () => {
+                if (confirm('هل أنت متأكد من مسح جميع سجلات الجرد السابقة؟')) {
+                    localStorage.removeItem('inventoryHistory');
+                    loadHistory();
+                    applyCarriedOverBalances();
+                    calculateAll();
+                    showModal("تم الحذف", "تم مسح السجل بنجاح.", true);
+                }
+            });
+        }
 
-        // نافذة عرض الإشعارات المخصصة
         function showModal(title, message, isSuccess = true) {
+            if (!modal || !modalContent) return;
             document.getElementById('modalTitle').textContent = title;
             document.getElementById('modalMessage').textContent = message;
             
             const iconContainer = modal.querySelector('.rounded-full');
-            if (isSuccess) {
-                iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4";
-                iconContainer.innerHTML = `<svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
-            } else {
-                iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4";
-                iconContainer.innerHTML = `<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
+            if (iconContainer) {
+                if (isSuccess) {
+                    iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4";
+                    iconContainer.innerHTML = `<svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
+                } else {
+                    iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4";
+                    iconContainer.innerHTML = `<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
+                }
             }
 
             modal.classList.remove('hidden');
@@ -441,45 +434,44 @@
             }, 10);
         }
 
-        closeModalBtn.addEventListener('click', () => {
-            modal.classList.add('opacity-0');
-            modalContent.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-        });
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', () => {
+                modal.classList.add('opacity-0');
+                modalContent.classList.add('scale-95');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            });
+        }
 
-        // إدارة الأصناف والمجموعات (المودال)
-        manageCategoriesBtn.addEventListener('click', openManageModal);
-        addFirstCategoryBtn.addEventListener('click', openManageModal);
-        closeManageModalBtn.addEventListener('click', closeManageModal);
+        if (manageCategoriesBtn) manageCategoriesBtn.addEventListener('click', openManageModal);
+        if (addFirstCategoryBtn) addFirstCategoryBtn.addEventListener('click', openManageModal);
+        if (closeManageModalBtn) closeManageModalBtn.addEventListener('click', closeManageModal);
 
         function openManageModal() {
+            if (!manageCategoriesModal) return;
             renderManageCategoriesList();
             manageCategoriesModal.classList.remove('hidden');
             setTimeout(() => {
                 manageCategoriesModal.classList.remove('opacity-0');
-                manageCategoriesModal.querySelector('.transform').classList.remove('scale-95');
+                manageCategoriesModal.querySelector('.transform')?.classList.remove('scale-95');
             }, 10);
         }
 
         function closeManageModal() {
+            if (!manageCategoriesModal) return;
             manageCategoriesModal.classList.add('opacity-0');
-            manageCategoriesModal.querySelector('.transform').classList.add('scale-95');
-            setTimeout(() => {
-                manageCategoriesModal.classList.add('hidden');
-            }, 300);
+            manageCategoriesModal.querySelector('.transform')?.classList.add('scale-95');
+            setTimeout(() => manageCategoriesModal.classList.add('hidden'), 300);
         }
 
-        // عرض قائمة الأصناف لإدارتها
         function renderManageCategoriesList() {
+            if (!categoriesListContainer) return;
             categoriesListContainer.innerHTML = '';
-            categories.forEach((cat, index) => {
+            categories.forEach((cat) => {
                 const itemHtml = `
                     <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <span class="text-gray-400 cursor-move font-bold text-lg">☰</span>
-                        <input type="text" value="${cat.name}" id="editName_${cat.id}" class="flex-1 px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none">
-                        <input type="number" value="${cat.price}" id="editPrice_${cat.id}" class="w-20 px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none text-center">
+                        <span class="text-gray-400 font-bold text-lg">☰</span>
+                        <input type="text" value="${cat.name}" id="editName_${cat.id}" class="flex-1 px-2 py-1 text-sm border rounded outline-none">
+                        <input type="number" value="${cat.price}" id="editPrice_${cat.id}" class="w-20 px-2 py-1 text-sm border rounded text-center">
                         <span class="text-xs text-gray-400">ج.م</span>
                         <button type="button" class="text-red-500 hover:text-red-700 p-1 delete-cat-btn" data-id="${cat.id}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -491,11 +483,10 @@
                 categoriesListContainer.insertAdjacentHTML('beforeend', itemHtml);
             });
 
-            // تفعيل أزرار الحذف للأصناف
             document.querySelectorAll('.delete-cat-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const idToDelete = this.getAttribute('data-id');
-                    if(confirm('هل أنت متأكد من حذف هذا الصنف؟ سيختفي من واجهة الجرد الحالية.')) {
+                    if(confirm('هل أنت متأكد من حذف هذا الصنف؟')) {
                         categories = categories.filter(c => c.id !== idToDelete);
                         renderManageCategoriesList();
                     }
@@ -503,81 +494,78 @@
             });
         }
 
-        // إضافة صنف جديد
-        addCategoryForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const name = newCatName.value.trim();
-            const price = parseInt(newCatPrice.value);
-            
-            if(!name || !price) return;
+        if (addCategoryForm) {
+            addCategoryForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const name = newCatName.value.trim();
+                const price = parseInt(newCatPrice.value);
+                if(!name || !price) return;
 
-            const newId = String(Date.now());
-            const randomThemeIdx = Math.floor(Math.random() * colorThemes.length);
+                categories.push({
+                    id: String(Date.now()),
+                    name: name,
+                    price: price,
+                    themeIdx: Math.floor(Math.random() * colorThemes.length)
+                });
 
-            categories.push({
-                id: newId,
-                name: name,
-                price: price,
-                themeIdx: randomThemeIdx
+                newCatName.value = '';
+                newCatPrice.value = '';
+                renderManageCategoriesList();
             });
+        }
 
-            newCatName.value = '';
-            newCatPrice.value = '';
-            renderManageCategoriesList();
-        });
+        if (saveCategoriesOrderBtn) {
+            saveCategoriesOrderBtn.addEventListener('click', () => {
+                let updatedCategories = [];
+                categories.forEach(cat => {
+                    const nameInp = document.getElementById(`editName_${cat.id}`);
+                    const priceInp = document.getElementById(`editPrice_${cat.id}`);
+                    if(nameInp && priceInp) {
+                        updatedCategories.push({
+                            id: cat.id,
+                            name: nameInp.value.trim() || cat.name,
+                            price: parseInt(priceInp.value) || cat.price,
+                            themeIdx: cat.themeIdx
+                        });
+                    } else {
+                        updatedCategories.push(cat);
+                    }
+                });
 
-        // حفظ تعديلات الأصناف بالكامل وإعادة بناء الواجهة
-        saveCategoriesOrderBtn.addEventListener('click', () => {
-            let updatedCategories = [];
-            
-            for(let i = 0; i < categories.length; i++) {
-                const cat = categories[i];
-                const nameInp = document.getElementById(`editName_${cat.id}`);
-                const priceInp = document.getElementById(`editPrice_${cat.id}`);
+                categories = updatedCategories;
+                localStorage.setItem('inventoryCategories', JSON.stringify(categories));
+                renderCategoryForms();
+                applyCarriedOverBalances();
+                calculateAll();
+                closeManageModal();
+                showModal("تم التحديث", "تم تحديث الأصناف بنجاح.", true);
+            });
+        }
 
-                if(nameInp && priceInp) {
-                    updatedCategories.push({
-                        id: cat.id,
-                        name: nameInp.value.trim() || cat.name,
-                        price: parseInt(priceInp.value) || cat.price,
-                        themeIdx: cat.themeIdx
-                    });
-                } else {
-                    updatedCategories.push(cat);
-                }
-            }
-
-            categories = updatedCategories;
-            localStorage.setItem('inventoryCategories', JSON.stringify(categories));
-            
-            renderCategoryForms();
-            applyCarriedOverBalances();
-            calculateAll();
-            closeManageModal();
-            showModal("تم التحديث", "تم تحديث الأصناف والمجموعات بنجاح.", true);
-        });
-
-        // PWA Banner Logic
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            pwaInstallBanner.classList.remove('hidden');
-            pwaInstallBanner.classList.add('flex');
-        });
-
-        pwaInstallBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    pwaInstallBanner.classList.add('hidden');
-                }
-                deferredPrompt = null;
+            if (pwaInstallBanner) {
+                pwaInstallBanner.classList.remove('hidden');
+                pwaInstallBanner.classList.add('flex');
             }
         });
 
-        pwaDismissBtn.addEventListener('click', () => {
-            pwaInstallBanner.classList.add('hidden');
-        });
+        if (pwaInstallBtn) {
+            pwaInstallBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted' && pwaInstallBanner) pwaInstallBanner.classList.add('hidden');
+                    deferredPrompt = null;
+                }
+            });
+        }
+
+        if (pwaDismissBtn) {
+            pwaDismissBtn.addEventListener('click', () => {
+                if (pwaInstallBanner) pwaInstallBanner.classList.add('hidden');
+            });
+        }
     });
 </script>
